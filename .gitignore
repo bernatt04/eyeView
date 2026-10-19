@@ -1,0 +1,6 @@
+#ignore build folder
+build/
+
+.vscode/
+compile_commands.json
+compile_flags.txt

@@ -3,7 +3,24 @@
   "tasks": [
     {
       "type": "shell",
-      "label": "Build with OpenCV",
+      "label": "CMake: Build Project",
+      "command": "C:/msys64/ucrt64/bin/cmake.exe",
+      "args": [
+        "--build",
+        "${workspaceFolder}/build"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [
+        "$gcc"
+      ],
+      "detail": "Compilar el proyecto eyeView con CMake"
+    },
+    {
+      "type": "shell",
+      "label": "Build Single File with OpenCV",
       "command": "C:/msys64/ucrt64/bin/g++.exe",
       "args": [
         "-fdiagnostics-color=always",
@@ -25,11 +42,8 @@
       "problemMatcher": [
         "$gcc"
       ],
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
-      "detail": "Build current file with MSYS2 UCRT64 GCC and OpenCV"
+      "group": "build",
+      "detail": "Compilar archivo individual con g++ y OpenCV"
     }
   ]
 }

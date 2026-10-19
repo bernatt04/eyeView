@@ -1,7 +1,8 @@
 [
   {
-    "directory": "c:/Users/berca/OneDrive/Documentos/GitHub/eyeView",
-    "command": "C:/msys64/ucrt64/bin/g++.exe -std=c++17 -IC:/msys64/ucrt64/include/opencv4 -c basics.cpp",
-    "file": "basics.cpp"
+    "directory": "C:/Users/berca/OneDrive/Documentos/GitHub/eyeView/build",
+    "command": "C:\\msys64\\ucrt64\\bin\\g++.exe -IC:/Users/berca/OneDrive/Documentos/GitHub/eyeView/src -isystem C:/msys64/ucrt64/include/opencv4 -std=c++17 -o CMakeFiles\\eyeView.dir\\src\\main.cpp.obj -c C:\\Users\\berca\\OneDrive\\Documentos\\GitHub\\eyeView\\src\\main.cpp",
+    "file": "C:/Users/berca/OneDrive/Documentos/GitHub/eyeView/src/main.cpp",
+    "output": "C:/Users/berca/OneDrive/Documentos/GitHub/eyeView/build/CMakeFiles/eyeView.dir/src/main.cpp.obj"
   }
 ]
