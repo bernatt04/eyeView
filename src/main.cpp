@@ -1,6 +1,5 @@
-#include "opencv2/core/types.hpp"
-#include "opencv2/highgui.hpp"
-#include "opencv2/videoio.hpp"
+#include <iostream>
+#include <opencv2/imgproc.hpp>
 #include <opencv2/opencv.hpp>
 #include <stdio.h>
 
@@ -11,25 +10,32 @@ int main() {
     std::cerr << "error when opening the camera";
     return -1;
   }
+
   cv::Mat frame;
+  cv::Mat grayFrame;
+
   while (true) {
     camera >> frame;
-
     if (frame.empty()) {
-      std::cerr << "error empty frame";
       break;
     }
 
-    cv::circle(frame, cv::Point(250, 250), 20, cv::Scalar(0, 0, 255));
+    cv::cvtColor(frame, grayFrame, cv::COLOR_BGR2GRAY);
 
-    cv::imshow("Webcam", frame);
+    int pixelValue = (int)grayFrame.at<uchar>(250, 250);
+
+    std::cout << "El valor del pixel (250,250) es : " << pixelValue
+              << std::endl;
+
+    cv::circle(grayFrame, cv::Point(250, 250), 20, cv::Scalar(0, 0, 255));
+
+    cv::imshow("Webcam en Blanco y Negro", grayFrame);
 
     int key = cv::waitKey(1);
     if (key == 'q') {
       break;
     }
   }
-
   camera.release();
   cv::destroyAllWindows();
   return 0;
