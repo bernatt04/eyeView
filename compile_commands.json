@@ -1,0 +1,7 @@
+[
+  {
+    "directory": "c:/Users/berca/OneDrive/Documentos/GitHub/eyeView",
+    "command": "C:/msys64/ucrt64/bin/g++.exe -std=c++17 -IC:/msys64/ucrt64/include/opencv4 -c basics.cpp",
+    "file": "basics.cpp"
+  }
+]
