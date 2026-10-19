@@ -7,8 +7,14 @@
 
 int main() {
   cv::CascadeClassifier faceCascade;
+  cv::CascadeClassifier eyeCascade;
 
   if (!faceCascade.load("models/haarcascade_frontalface_default.xml")) {
+    std::cerr << "error al cargar el modelo";
+    return -1;
+  }
+
+  if (!eyeCascade.load("models/haarcascade_eye.xml")) {
     std::cerr << "error al cargar el modelo";
     return -1;
   }
@@ -38,7 +44,20 @@ int main() {
     faceCascade.detectMultiScale(grayFrame, faces, 1.1, 4);
 
     for (size_t i = 0; i < faces.size(); i++) {
-      cv::rectangle(frame, faces[i], cv::Scalar(0, 255, 0));
+      cv::Mat faceROI = grayFrame(faces[i]);
+      std::vector<cv::Rect> eyes;
+      eyeCascade.detectMultiScale(faceROI, eyes, 1.1, 3);
+
+      for (size_t j = 0; j < eyes.size(); j++) {
+        // point1 will be top left corner of the eye which will be in the faces
+        // ROI so we have to calculate the position of the eye inside the
+        // position of the face.
+        // then we do the same for the bottom right corner.
+        cv::Point Point1(faces[i].x + eyes[j].x, faces[i].y + eyes[j].y);
+        cv::Point Point2(faces[i].x + eyes[j].x + eyes[j].width,
+                         faces[i].y + eyes[j].y + eyes[j].height);
+        cv::rectangle(frame, Point1, Point2, cv::Scalar(0, 255, 0));
+      }
     }
 
     cv::imshow("Face detection", frame);
