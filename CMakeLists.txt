@@ -13,21 +13,25 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Exporta compile_commands.json para autocompletado del IDE (clangd)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Buscar paquete de OpenCV
+# Buscar paquetes de OpenCV y Dlib
 find_package(OpenCV REQUIRED)
+find_package(dlib REQUIRED)
 
 # Definir el ejecutable
 add_executable(eyeView
     src/main.cpp
 )
 
-# Incluir cabeceras de OpenCV y del proyecto (Buenas prácticas de Modern CMake)
+# Incluir cabeceras de OpenCV y del proyecto
 target_include_directories(eyeView PRIVATE
     ${OpenCV_INCLUDE_DIRS}
     ${PROJECT_SOURCE_DIR}/src
 )
 
-# Enlazar las librerías de OpenCV al ejecutable
+# Enlazar OpenCV, Dlib y las librerías matemáticas (lapack y blas)
 target_link_libraries(eyeView PRIVATE
     ${OpenCV_LIBS}
+    dlib::dlib 
+    lapack 
+    blas
 )
