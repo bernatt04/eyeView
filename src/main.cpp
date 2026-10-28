@@ -389,3 +389,98 @@ int main() {
 // exact center of the black pupil mass. Draw a cv::line in the main frame from
 // the anatomical center of the eye (from Challenge 1) to the dynamic pupil
 // center to track the gaze direction.
+
+int main() {
+  dlib::frontal_face_detector faceDetector = dlib::get_frontal_face_detector();
+  dlib::shape_predictor shapePredictor;
+
+  try {
+    dlib::deserialize("models/shape_predictor_68_face_landmarks.dat") >>
+        shapePredictor;
+  } catch (const dlib::serialization_error &se) {
+    std::cerr << se.what() << std::endl;
+    return -1;
+  }
+
+  cv::VideoCapture camera(0);
+
+  if (!camera.isOpened()) {
+    return -1;
+  }
+
+  cv::Mat frame;
+
+  while (true) {
+    camera >> frame;
+
+    if (frame.empty()) {
+      break;
+    }
+
+    dlib::cv_image<dlib::bgr_pixel> dlibFrame(frame);
+    std::vector<dlib::rectangle> faces = faceDetector(dlibFrame);
+
+    for (int i = 0; i < faces.size(); i++) {
+      dlib::full_object_detection shape = shapePredictor(dlibFrame, faces[i]);
+      std::vector<cv::Point> eyePoints;
+
+      for (int j = 36; j <= 41; j++) {
+        eyePoints.push_back(cv::Point(shape.part(j).x(), shape.part(j).y()));
+      }
+      cv::Rect r = cv::boundingRect(eyePoints);
+      r &= cv::Rect(0, 0, frame.cols, frame.rows);
+
+      if (r.width <= 0 || r.height <= 0) {
+        continue;
+      }
+      cv::Mat ojo = frame(r).clone();
+      cv::Mat gris;
+      cv::cvtColor(ojo, gris, cv::COLOR_BGR2GRAY);
+      cv::Mat binario;
+      cv::threshold(gris, binario, 70, 255, cv::THRESH_BINARY_INV);
+
+      std::vector<cv::Point> puntosLocales;
+
+      for (const cv::Point &p : eyePoints) {
+        puntosLocales.push_back(p - r.tl());
+      }
+
+      cv::Mat mascara = cv::Mat::zeros(binario.size(), CV_8UC1);
+      cv::fillPoly(mascara, std::vector<std::vector<cv::Point>>{puntosLocales},
+                   cv::Scalar(255));
+
+      cv::bitwise_and(binario, mascara, binario);
+      cv::Moments m = cv::moments(binario, true);
+
+      cv::Point centroOjo(r.x + r.width / 2, r.y + r.height / 2);
+
+      cv::circle(frame, centroOjo, 3, cv::Scalar(255, 0, 0), -1);
+
+      if (m.m00 > 0) {
+        int pupilX = static_cast<int>(m.m10 / m.m00);
+        int pupilY = static_cast<int>(m.m01 / m.m00);
+
+        cv::Point centroPupila(pupilX + r.x, pupilY + r.y);
+
+        cv::circle(frame, centroPupila, 3, cv::Scalar(0, 0, 255), -1);
+
+        cv::line(frame, centroOjo, centroPupila, cv::Scalar(0, 255, 0), 2);
+      }
+
+      cv::rectangle(frame, r, cv::Scalar(0, 255, 0), 1);
+      cv::imshow("Ojo binario", binario);
+    }
+
+    cv::imshow("Webcam", frame);
+
+    int key = cv::waitKey(1);
+    if (key == 'q') {
+      break;
+    }
+  }
+
+  camera.release();
+  cv::destroyAllWindows();
+
+  return 0;
+}
