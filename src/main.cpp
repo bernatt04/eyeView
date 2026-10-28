@@ -1,6 +1,7 @@
 #include <dlib/geometry/rectangle.h>
 #include <dlib/image_processing/full_object_detection.h>
 #include <dlib/image_processing/shape_predictor.h>
+#include <dlib/misc_api/misc_api_kernel_1.h>
 #include <dlib/opencv/cv_image.h>
 #include <dlib/pixel.h>
 #include <dlib/serialize.h>
@@ -397,8 +398,7 @@ int main() {
   try {
     dlib::deserialize("models/shape_predictor_68_face_landmarks.dat") >>
         shapePredictor;
-  } catch (const dlib::serialization_error &se) {
-    std::cerr << se.what() << std::endl;
+  } catch (const dlib::serialization_error se) {
     return -1;
   }
 
@@ -422,53 +422,73 @@ int main() {
 
     for (int i = 0; i < faces.size(); i++) {
       dlib::full_object_detection shape = shapePredictor(dlibFrame, faces[i]);
-      std::vector<cv::Point> eyePoints;
 
-      for (int j = 36; j <= 41; j++) {
-        eyePoints.push_back(cv::Point(shape.part(j).x(), shape.part(j).y()));
+      int minX = shape.part(36).x();
+      int minY = shape.part(36).y();
+      int maxX = shape.part(36).x();
+      int maxY = shape.part(36).y();
+
+      int sumaX = shape.part(36).x();
+      int sumaY = shape.part(36).y();
+
+      for (int j = 37; j < 42; j++) {
+        if (minX > shape.part(j).x()) {
+          minX = shape.part(j).x();
+        }
+        if (minY > shape.part(j).y()) {
+          minY = shape.part(j).y();
+        }
+        if (maxX < shape.part(j).x()) {
+          maxX = shape.part(j).x();
+        }
+        if (maxY < shape.part(j).y()) {
+          maxY = shape.part(j).y();
+        }
+
+        sumaX += shape.part(j).x();
+        sumaY += shape.part(j).y();
       }
-      cv::Rect r = cv::boundingRect(eyePoints);
-      r &= cv::Rect(0, 0, frame.cols, frame.rows);
 
-      if (r.width <= 0 || r.height <= 0) {
+      cv::Point centroOjo(sumaX / 6, sumaY / 6);
+
+      if (minX < 0 || minY < 0 || maxX >= frame.cols || maxY >= frame.rows ||
+          maxX <= minX || maxY <= minY) {
         continue;
       }
-      cv::Mat ojo = frame(r).clone();
+
+      cv::Rect r(minX, minY, maxX - minX, maxY - minY);
+      cv::Mat ojo = frame(r);
+
       cv::Mat gris;
       cv::cvtColor(ojo, gris, cv::COLOR_BGR2GRAY);
-      cv::Mat binario;
-      cv::threshold(gris, binario, 70, 255, cv::THRESH_BINARY_INV);
 
-      std::vector<cv::Point> puntosLocales;
+      cv::threshold(gris, gris, 100, 255, cv::THRESH_BINARY_INV);
 
-      for (const cv::Point &p : eyePoints) {
-        puntosLocales.push_back(p - r.tl());
-      }
-
-      cv::Mat mascara = cv::Mat::zeros(binario.size(), CV_8UC1);
-      cv::fillPoly(mascara, std::vector<std::vector<cv::Point>>{puntosLocales},
-                   cv::Scalar(255));
-
-      cv::bitwise_and(binario, mascara, binario);
-      cv::Moments m = cv::moments(binario, true);
-
-      cv::Point centroOjo(r.x + r.width / 2, r.y + r.height / 2);
-
-      cv::circle(frame, centroOjo, 3, cv::Scalar(255, 0, 0), -1);
+      cv::Moments m = cv::moments(gris, true);
 
       if (m.m00 > 0) {
-        int pupilX = static_cast<int>(m.m10 / m.m00);
-        int pupilY = static_cast<int>(m.m01 / m.m00);
+        int pupilX = m.m10 / m.m00;
+        int pupilY = m.m01 / m.m00;
 
-        cv::Point centroPupila(pupilX + r.x, pupilY + r.y);
+        cv::Point centroPupila(pupilX + minX, pupilY + minY);
 
+        float normX = centroOjo.x - centroPupila.x;
+        float normY = centroOjo.y - centroPupila.y;
+
+        normX = normX / (static_cast<float>(r.width) / 2);
+        normY = normY / (static_cast<float>(r.height) / 2);
+
+        std::cout << "\rNormX: " << std::fixed << std::setprecision(3) << normX
+                  << " | NormY: " << normY << "    " << std::flush;
+
+        cv::circle(frame, centroOjo, 3, cv::Scalar(255, 0, 0), -1);
         cv::circle(frame, centroPupila, 3, cv::Scalar(0, 0, 255), -1);
 
         cv::line(frame, centroOjo, centroPupila, cv::Scalar(0, 255, 0), 2);
       }
 
       cv::rectangle(frame, r, cv::Scalar(0, 255, 0), 1);
-      cv::imshow("Ojo binario", binario);
+      cv::imshow("Ojo", gris);
     }
 
     cv::imshow("Webcam", frame);
