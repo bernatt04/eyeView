@@ -1,49 +1,69 @@
 # eyeView
 
-A C++ webcam eye tracker I'm building with OpenCV and Dlib. The idea is to go from basic face detection all the way to estimating where I'm looking on the screen.
+A C++ computer vision project aimed at figuring out where someone is looking inside a room using two cameras facing opposite directions. One camera faces the user to track their eyes and estimate gaze direction; the second faces outward to capture the room. By calibrating both cameras, transforming between their coordinate systems, and projecting the gaze vector onto the outward feed, the system should be able to pinpoint the gaze target in the scene.
 
-![demo](assets/demo.gif)
+Right now the project is in an early stage and only covers the user-facing side: face detection, eye landmarks, basic pupil localization, and a raw normalized gaze vector from a single webcam.
 
-Live Dlib eye ROI tracking with binary thresholding applied in-place on the eye region so the dark pupil stands out from the sclera.
+![eyeView demo](assets/demo.gif)
 
-## What I've got so far
+Eye ROI tracking with Dlib and in-place binary thresholding on the eye region to separate the dark pupil from the sclera.
 
-Started with OpenCV Haar cascades just to get the basics down (notes in [JOURNAL.md](JOURNAL.md)), then moved to Dlib's 68-point facial landmark model since Haar was too noisy.
+## Architecture
 
-Right now `src/main.cpp` does this in real time:
-- Detects the face and pulls the 6 eye landmarks (points 36-41) to get the eye center and crop a tight ROI around it.
-- Converts that crop to grayscale, applies an inverse binary threshold (`100`), and uses `cv::moments` to find the center of mass of the dark area (the pupil).
-- Computes a normalized offset (`NormX`, `NormY`) from the eye center to the pupil relative to half the eye box size, prints it to the terminal, and draws the vector on the feed.
+The target pipeline combines two camera streams into a single gaze point on the scene:
 
-Earlier tests like blink detection with EAR (Eye Aspect Ratio) are also in `src/main.cpp`, commented out while I work on the gaze vector.
+```text
+[User-facing camera]  --> face & landmarks --> pupil center & gaze vector --\
+                                                                             +--> calibration & coordinate transform --> gaze point on scene
+[Scene-facing camera] --> environment frame --------------------------------/
+```
 
-## What's still missing
+Only the front half of the top branch is implemented so far (face detection, eye cropping, and a basic 2D normalized offset in `src/main.cpp`). Camera calibration, coordinate transforms between cameras, and the scene-facing stream are not built yet.
 
-- Only tracks one eye right now.
-- The binary threshold is hardcoded to `100`, so lighting changes, shadows, or eyelashes inside the box throw off the pupil center pretty easily.
-- No smoothing yet, so the vector jitters from frame to frame.
-- Blink detection isn't hooked into the main loop, so blinking sends garbage coordinates.
-- Outputs raw normalized offsets (`NormX`, `NormY`) instead of screen `(x, y)` coordinates, and moving your head messes up the values.
+## Current progress
 
-## Next steps
+I started with OpenCV Haar cascades to build a simple baseline (documented in [JOURNAL.md](JOURNAL.md)): face and eye detection, grayscale + `equalizeHist`, local-to-global coordinate conversion, and a simple upper-face filter to cut down false positives.
 
-1. **Better pupil detection**  
-   Mask the eye ROI to the 6-landmark polygon instead of a rectangle so eyelashes and eyebrows don't skew `cv::moments`. Swap the hardcoded `100` threshold for adaptive thresholding (or Otsu) plus basic contour filtering, track both eyes, hook EAR blink filtering back in, and add smoothing (moving average or Kalman filter) to kill the jitter.
+After that I moved to Dlib's HOG frontal face detector and `models/shape_predictor_68_face_landmarks.dat`. What's currently running in `src/main.cpp`:
+- Extracts the 6 landmarks for one eye (indices 36-41) to compute the eye center and crop a bounded ROI around it.
+- Converts the eye crop to grayscale, applies an inverse binary threshold (`cv::THRESH_BINARY_INV` at `100`), and runs `cv::moments` to estimate the pupil center of mass.
+- Computes a normalized offset (`NormX`, `NormY`) between the eye center and pupil center relative to half the ROI width and height, prints it in the terminal, and draws the vector on the frame.
 
-2. **Calibration**  
-   Add a 5-point or 9-point calibration step where I look at targets on screen and record average `(NormX, NormY)` readings, then fit a mapping (like polynomial regression) to turn them into screen coordinates. Later on I also need to account for head movement.
+Earlier exercises from this phase (eye centroids, EAR blink detection, and the in-place thresholded eye crop shown in the clip above) are still in `src/main.cpp` as commented-out blocks.
 
-3. **Evaluating accuracy**  
-   Test the calibrated tracker against fixed targets across the screen and measure the actual error (pixels and degrees) plus fixation jitter under different lighting and distances, so I can tell if changes to the pupil detector actually help.
+What is still experimental or missing:
+- Only one eye (36-41) is tracked in the active loop.
+- The threshold is hardcoded to `100`, so lighting changes, shadows, and eyelashes inside the rectangular crop pull the pupil centroid off target pretty easily.
+- Raw frame-to-frame coordinates have no smoothing and jitter noticeably.
+- EAR blink detection isn't integrated into the gaze loop yet, so blinks produce noisy vectors.
+- No camera or gaze calibration, no head-pose handling, no second camera, and no quantitative accuracy tests yet.
 
-## Building and running
+## Roadmap
 
-Needs CMake (3.16+), a C++17 compiler, OpenCV, Dlib (with BLAS/LAPACK), and a webcam.
+1. Improve pupil detection and clean up the codebase. Mask the eye crop to the 6-point eye polygon instead of a rectangle so eyelashes and eyebrows don't bias `cv::moments`. Replace the fixed `100` threshold with adaptive thresholding (or Otsu) and basic contour filtering, track both eyes, wire EAR blink filtering back in, add temporal smoothing (moving average or Kalman filter), and split `src/main.cpp` into separate modules.
+2. Add calibration and evaluate accuracy. Build a calibration routine to map raw eye vectors to known targets, then measure actual pixel and angular error (plus fixation jitter) across different lighting conditions and distances from the camera. Account for head pose so small head movements don't break calibration.
+3. Integrate the second camera and scene projection. Capture the outward-facing room camera alongside the eye camera, calibrate intrinsics and the extrinsic transform between the two opposite-facing cameras, and project the estimated gaze ray onto the room frame.
+
+## Technologies
+
+- C++17
+- OpenCV 4
+- Dlib (HOG face detector and 68-point shape predictor)
+- CMake (>= 3.16), BLAS, LAPACK
+
+## Setup
+
+Install CMake (3.16+), a C++17 compiler, OpenCV, and Dlib (linked with BLAS and LAPACK), then build from the repo root:
 
 ```bash
 cmake -B build
 cmake --build build
+```
+
+Run from the repository root so `models/shape_predictor_68_face_landmarks.dat` resolves properly:
+
+```bash
 ./build/eyeView
 ```
 
-Run it from the repo root so it can find `models/shape_predictor_68_face_landmarks.dat`. Press `q` to close.
+Press `q` to quit.
